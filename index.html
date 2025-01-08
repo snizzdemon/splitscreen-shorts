@@ -42,6 +42,9 @@
         .download-btn:hover {
             background-color: #45a049;
         }
+        h1 {
+            color: #333;
+        }
     </style>
 </head>
 <body>
@@ -51,13 +54,18 @@
     <div id="video-list" class="video-container"></div>
 
     <script>
+        // Insert your YouTube Data API Key here
         const apiKey = 'YOUR_YOUTUBE_API_KEY'; // Replace with your YouTube API Key
         const youtubeApiUrl = `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&chart=mostPopular&regionCode=US&videoCategoryId=10&key=${apiKey}`;
 
         async function fetchVideos() {
-            const response = await fetch(youtubeApiUrl);
-            const data = await response.json();
-            displayVideos(data.items);
+            try {
+                const response = await fetch(youtubeApiUrl);
+                const data = await response.json();
+                displayVideos(data.items);
+            } catch (error) {
+                console.error('Error fetching data from YouTube API:', error);
+            }
         }
 
         function displayVideos(videos) {
@@ -76,8 +84,9 @@
                 const videoTitle = document.createElement('h3');
                 videoTitle.textContent = video.snippet.title;
 
+                // Download Button - This is a placeholder. You will need to replace it with a legal download link.
                 const downloadBtn = document.createElement('a');
-                downloadBtn.href = `https://www.y2mate.com/youtube/${video.id}`; // This is just an example link; use an appropriate download method.
+                downloadBtn.href = `https://www.y2mate.com/youtube/${video.id}`; // Example link for download, replace with proper logic
                 downloadBtn.classList.add('download-btn');
                 downloadBtn.textContent = 'Download Video';
 
@@ -89,7 +98,7 @@
             });
         }
 
-        fetchVideos();
+        fetchVideos(); // Fetch and display viral videos on page load
     </script>
 </body>
 </html>
