@@ -1,135 +1,95 @@
-Flask==2.2.2
-google-api-python-client==2.80.0
-yt-dlp==2023.01.11
-moviepy==1.0.3
-import os
-import yt_dlp as youtube_dl
-from googleapiclient.discovery import build
-from moviepy.editor import VideoFileClip, clips_array
-from flask import Flask, render_template, request, jsonify, send_file
-
-# Initialize Flask app
-app = Flask(__name__)
-
-# YouTube API Key (replace with your own API key)
-API_KEY = 'YOUR_YOUTUBE_API_KEY'
-
-# Function to get trending Creative Commons videos from YouTube
-def get_youtube_video_urls(api_key, query="Minecraft parkour", max_results=5):
-    youtube = build('youtube', 'v3', developerKey=api_key)
-    request = youtube.search().list(
-        q=query, part="id,snippet", type="video", videoLicense="creativeCommon", order="viewCount", maxResults=max_results
-    )
-    response = request.execute()
-
-    video_urls = []
-    for item in response.get("items", []):
-        video_id = item["id"]["videoId"]
-        video_urls.append(f"https://www.youtube.com/watch?v={video_id}")
-    
-    return video_urls
-
-# Function to download a YouTube video given a URL and output path
-def download_video(url, output_path):
-    options = {
-        'format': 'best',
-        'outtmpl': output_path,
-    }
-    with youtube_dl.YoutubeDL(options) as ydl:
-        ydl.download([url])
-
-# Function to create a split-screen video
-def create_split_screen_video(clip1_path, clip2_path, output_path):
-    clip1 = VideoFileClip(clip1_path)
-    clip2 = VideoFileClip(clip2_path)
-
-    # Resize both clips to have the same width (height depends on the aspect ratio)
-    clip1_resized = clip1.resize(width=640)
-    clip2_resized = clip2.resize(width=640)
-
-    # Synchronize the duration of both clips
-    min_duration = min(clip1_resized.duration, clip2_resized.duration)
-    clip1_resized = clip1_resized.subclip(0, min_duration)
-    clip2_resized = clip2_resized.subclip(0, min_duration)
-
-    # Position clip1 at the top and clip2 at the bottom (split-screen)
-    final_clip = clips_array([[clip1_resized], [clip2_resized]])
-
-    # Write the final video to a file
-    final_clip.write_videofile(output_path, codec="libx264", fps=24)
-
-# Flask route to serve the homepage
-@app.route('/')
-def index():
-    return render_template('index.html')
-
-# API route to generate split-screen video
-@app.route('/generate_video', methods=['POST'])
-def generate_video():
-    # Fetch the query from the request data
-    data = request.get_json()
-    query = data.get('query', 'Minecraft parkour')
-
-    # Get YouTube video URLs based on the query
-    video_urls = get_youtube_video_urls(API_KEY, query)
-
-    if len(video_urls) < 2:
-        return jsonify({"error": "Not enough videos found."}), 400
-
-    # Download the top two videos
-    download_video(video_urls[0], 'static/videos/clip1.mp4')
-    download_video(video_urls[1], 'static/videos/clip2.mp4')
-
-    # Create the split-screen video
-    create_split_screen_video('static/videos/clip1.mp4', 'static/videos/clip2.mp4', 'static/videos/output_video.mp4')
-
-    # Clean up downloaded video files
-    os.remove('static/videos/clip1.mp4')
-    os.remove('static/videos/clip2.mp4')
-
-    return send_file('static/videos/output_video.mp4', as_attachment=True)
-
-# Run the Flask app
-if __name__ == '__main__':
-    app.run(debug=True)
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trending Split-Screen Video Generator</title>
+    <title>Viral Clips Downloader</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            color: #333;
+            text-align: center;
+            padding: 20px;
+        }
+        .video-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .video-card {
+            margin: 10px;
+            padding: 10px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            width: 300px;
+        }
+        iframe {
+            width: 100%;
+            height: 200px;
+        }
+        .download-btn {
+            display: inline-block;
+            padding: 10px 20px;
+            margin-top: 10px;
+            background-color: #4CAF50;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .download-btn:hover {
+            background-color: #45a049;
+        }
+    </style>
 </head>
 <body>
-    <h1>Trending Split-Screen Video Generator</h1>
+    <h1>Viral Clips Downloader</h1>
+    <p>Check out the most popular viral clips that you can legally download.</p>
 
-    <div>
-        <label for="query">Enter a search query (e.g., Minecraft parkour):</label>
-        <input type="text" id="query" name="query" placeholder="e.g., Minecraft parkour">
-    </div>
-    
-    <button onclick="generateVideo()">Generate Split-Screen Video</button>
-
-    <h2>Generated Video:</h2>
-    <video id="video" controls></video>
+    <div id="video-list" class="video-container"></div>
 
     <script>
-        async function generateVideo() {
-            const query = document.getElementById('query').value;
-            const response = await fetch('/generate_video', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ query })
-            });
+        const apiKey = 'YOUR_YOUTUBE_API_KEY'; // Replace with your YouTube API Key
+        const youtubeApiUrl = `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&chart=mostPopular&regionCode=US&videoCategoryId=10&key=${apiKey}`;
 
-            if (response.ok) {
-                const videoUrl = URL.createObjectURL(await response.blob());
-                document.getElementById('video').src = videoUrl;
-            } else {
-                alert("Error generating video.");
-            }
+        async function fetchVideos() {
+            const response = await fetch(youtubeApiUrl);
+            const data = await response.json();
+            displayVideos(data.items);
         }
+
+        function displayVideos(videos) {
+            const videoListContainer = document.getElementById('video-list');
+            videoListContainer.innerHTML = ''; // Clear previous videos
+
+            videos.forEach(video => {
+                const videoCard = document.createElement('div');
+                videoCard.classList.add('video-card');
+
+                const videoIframe = document.createElement('iframe');
+                videoIframe.src = `https://www.youtube.com/embed/${video.id}`;
+                videoIframe.allow = 'accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture';
+                videoIframe.allowFullscreen = true;
+
+                const videoTitle = document.createElement('h3');
+                videoTitle.textContent = video.snippet.title;
+
+                const downloadBtn = document.createElement('a');
+                downloadBtn.href = `https://www.y2mate.com/youtube/${video.id}`; // This is just an example link; use an appropriate download method.
+                downloadBtn.classList.add('download-btn');
+                downloadBtn.textContent = 'Download Video';
+
+                videoCard.appendChild(videoIframe);
+                videoCard.appendChild(videoTitle);
+                videoCard.appendChild(downloadBtn);
+
+                videoListContainer.appendChild(videoCard);
+            });
+        }
+
+        fetchVideos();
     </script>
 </body>
 </html>
