@@ -1,142 +1,70 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Brainrot Video Generator</title>
-  <link rel="stylesheet" href="styles.css">
-</head>
-<body>
-  <div class="container">
-    <h1>Brainrot Video Generator</h1>
+import os
+import yt_dlp as youtube_dl
+from googleapiclient.discovery import build
+from moviepy.editor import VideoFileClip, clips_array
+
+# Function to get video URLs from YouTube based on a query and number of results
+def get_youtube_video_urls(api_key, query="Minecraft parkour", max_results=5):
+    youtube = build('youtube', 'v3', developerKey=api_key)
+    request = youtube.search().list(
+        q=query, part="id,snippet", type="video", order="viewCount", maxResults=max_results
+    )
+    response = request.execute()
     
-    <!-- Clip Selection -->
-    <div class="selection">
-      <label for="famousClip">Choose a famous clip (e.g., Joe Rogan, Military):</label>
-      <select id="famousClip">
-        <option value="joeRogan">Joe Rogan</option>
-        <option value="military">Military Clips</option>
-      </select>
-    </div>
+    video_urls = []
+    for item in response.get("items", []):
+        video_id = item["id"]["videoId"]
+        video_urls.append(f"https://www.youtube.com/watch?v={video_id}")
     
-    <div class="selection">
-      <label for="minecraftClip">Choose Minecraft Parkour Clip:</label>
-      <select id="minecraftClip">
-        <option value="parkour1">Parkour Clip 1</option>
-        <option value="parkour2">Parkour Clip 2</option>
-      </select>
-    </div>
+    return video_urls
 
-    <button id="generateBtn">Generate Split-Screen Video</button>
+# Function to download a YouTube video given a URL and output path
+def download_video(url, output_path):
+    options = {
+        'format': 'best',
+        'outtmpl': output_path,
+    }
+    with youtube_dl.YoutubeDL(options) as ydl:
+        ydl.download([url])
 
-    <!-- Video Player -->
-    <div id="videoPlayer">
-      <video id="generatedVideo" width="600" controls>
-        Your browser does not support the video tag.
-      </video>
-    </div>
-  </div>
-
-  <script src="scripts.js"></script>
-</body>
-</html>
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-body {
-  font-family: Arial, sans-serif;
-  background-color: #f0f0f0;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 100vh;
-}
-
-.container {
-  background-color: white;
-  padding: 20px;
-  border-radius: 10px;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-  text-align: center;
-}
-
-h1 {
-  margin-bottom: 20px;
-}
-
-.selection {
-  margin-bottom: 20px;
-}
-
-button {
-  padding: 10px 20px;
-  background-color: #4CAF50;
-  color: white;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-}
-
-button:hover {
-  background-color: #45a049;
-}
-
-#videoPlayer {
-  margin-top: 20px;
-}
-document.getElementById('generateBtn').addEventListener('click', async () => {
-  const famousClip = document.getElementById('famousClip').value;
-  const minecraftClip = document.getElementById('minecraftClip').value;
-  
-  // Trigger video generation via backend (this is a placeholder example)
-  const videoUrl = await generateVideo(famousClip, minecraftClip);
-  
-  // Display the generated video
-  const videoElement = document.getElementById('generatedVideo');
-  videoElement.src = videoUrl;
-});
-
-// Placeholder function to simulate video generation (you would connect to your backend here)
-async function generateVideo(famousClip, minecraftClip) {
-  // For the sake of simplicity, we return a hardcoded video URL
-  // In reality, you would call your backend to process the video and get a URL or file
-  return 'https://www.w3schools.com/html/mov_bbb.mp4';  // Example placeholder video
-}
-pip install Flask
-from flask import Flask, jsonify, request
-import subprocess
-
-app = Flask(__name__)
-
-@app.route('/generate_video', methods=['POST'])
-def generate_video():
-    # Get the selected clips from the frontend
-    famous_clip = request.json.get('famousClip')
-    minecraft_clip = request.json.get('minecraftClip')
+# Function to create a split-screen video
+def create_split_screen_video(clip1_path, clip2_path, output_path):
+    clip1 = VideoFileClip(clip1_path)
+    clip2 = VideoFileClip(clip2_path)
     
-    # Example clips (you would use actual paths to video files here)
-    famous_clip_path = f'./clips/{famous_clip}.mp4'
-    minecraft_clip_path = f'./clips/{minecraft_clip}.mp4'
+    # Resize both clips to have the same height
+    clip1_resized = clip1.resize(height=360)
+    clip2_resized = clip2.resize(height=360)
+    
+    # Synchronize the duration of both clips
+    min_duration = min(clip1_resized.duration, clip2_resized.duration)
+    clip1_resized = clip1_resized.subclip(0, min_duration)
+    clip2_resized = clip2_resized.subclip(0, min_duration)
+    
+    # Combine both clips into a split-screen format
+    final_clip = clips_array([[clip1_resized, clip2_resized]])
+    
+    # Write the final video to a file
+    final_clip.write_videofile(output_path, codec="libx264", fps=24)
 
-    # Output file name
-    output_file = './generated_video/output.mp4'
+# Main function to download videos and create a split-screen video
+def main():
+    api_key = 'YOUR_YOUTUBE_API_KEY'  # Replace with your YouTube API key
+    video_urls = get_youtube_video_urls(api_key)
+    
+    # Download the first two Minecraft parkour videos (or any video content)
+    download_video(video_urls[0], 'clip1.mp4')
+    download_video(video_urls[1], 'clip2.mp4')
+    
+    # Create the split-screen video from the downloaded clips
+    create_split_screen_video('clip1.mp4', 'clip2.mp4', 'split_screen_parkour.mp4')
 
-    # FFmpeg command to merge videos into a split-screen format
-    command = [
-        'ffmpeg', '-i', famous_clip_path, '-i', minecraft_clip_path,
-        '-filter_complex', '[0:v]scale=1280x720,setsar=1[v0];[1:v]scale=1280x720,setsar=1[v1];[v0][v1]vstack=inputs=2[v]',
-        '-map', '[v]', '-map', '0:a', '-map', '1:a',
-        '-c:v', 'libx264', '-c:a', 'aac', '-strict', 'experimental', output_file
-    ]
+    # Clean up downloaded video files
+    os.remove('clip1.mp4')
+    os.remove('clip2.mp4')
 
-    # Run the FFmpeg command
-    subprocess.run(command)
+    print("Split-screen video created successfully: split_screen_parkour.mp4")
 
-    # Return the generated video URL
-    return jsonify({'videoUrl': 'http://yourserver.com/generated_video/output.mp4'})
-
+# Run the main function
 if __name__ == '__main__':
-    app.run(debug=True)
+    main()
