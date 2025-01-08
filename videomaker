@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Brainrot Video Generator</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Brainrot Video Generator</h1>
+    
+    <!-- Clip Selection -->
+    <div class="selection">
+      <label for="famousClip">Choose a famous clip (e.g., Joe Rogan, Military):</label>
+      <select id="famousClip">
+        <option value="joeRogan">Joe Rogan</option>
+        <option value="military">Military Clips</option>
+      </select>
+    </div>
+    
+    <div class="selection">
+      <label for="minecraftClip">Choose Minecraft Parkour Clip:</label>
+      <select id="minecraftClip">
+        <option value="parkour1">Parkour Clip 1</option>
+        <option value="parkour2">Parkour Clip 2</option>
+      </select>
+    </div>
+
+    <button id="generateBtn">Generate Split-Screen Video</button>
+
+    <!-- Video Player -->
+    <div id="videoPlayer">
+      <video id="generatedVideo" width="600" controls>
+        Your browser does not support the video tag.
+      </video>
+    </div>
+  </div>
+
+  <script src="scripts.js"></script>
+</body>
+</html>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: Arial, sans-serif;
+  background-color: #f0f0f0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+}
+
+.container {
+  background-color: white;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  text-align: center;
+}
+
+h1 {
+  margin-bottom: 20px;
+}
+
+.selection {
+  margin-bottom: 20px;
+}
+
+button {
+  padding: 10px 20px;
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+button:hover {
+  background-color: #45a049;
+}
+
+#videoPlayer {
+  margin-top: 20px;
+}
+document.getElementById('generateBtn').addEventListener('click', async () => {
+  const famousClip = document.getElementById('famousClip').value;
+  const minecraftClip = document.getElementById('minecraftClip').value;
+  
+  // Trigger video generation via backend (this is a placeholder example)
+  const videoUrl = await generateVideo(famousClip, minecraftClip);
+  
+  // Display the generated video
+  const videoElement = document.getElementById('generatedVideo');
+  videoElement.src = videoUrl;
+});
+
+// Placeholder function to simulate video generation (you would connect to your backend here)
+async function generateVideo(famousClip, minecraftClip) {
+  // For the sake of simplicity, we return a hardcoded video URL
+  // In reality, you would call your backend to process the video and get a URL or file
+  return 'https://www.w3schools.com/html/mov_bbb.mp4';  // Example placeholder video
+}
+pip install Flask
+from flask import Flask, jsonify, request
+import subprocess
+
+app = Flask(__name__)
+
+@app.route('/generate_video', methods=['POST'])
+def generate_video():
+    # Get the selected clips from the frontend
+    famous_clip = request.json.get('famousClip')
+    minecraft_clip = request.json.get('minecraftClip')
+    
+    # Example clips (you would use actual paths to video files here)
+    famous_clip_path = f'./clips/{famous_clip}.mp4'
+    minecraft_clip_path = f'./clips/{minecraft_clip}.mp4'
+
+    # Output file name
+    output_file = './generated_video/output.mp4'
+
+    # FFmpeg command to merge videos into a split-screen format
+    command = [
+        'ffmpeg', '-i', famous_clip_path, '-i', minecraft_clip_path,
+        '-filter_complex', '[0:v]scale=1280x720,setsar=1[v0];[1:v]scale=1280x720,setsar=1[v1];[v0][v1]vstack=inputs=2[v]',
+        '-map', '[v]', '-map', '0:a', '-map', '1:a',
+        '-c:v', 'libx264', '-c:a', 'aac', '-strict', 'experimental', output_file
+    ]
+
+    # Run the FFmpeg command
+    subprocess.run(command)
+
+    # Return the generated video URL
+    return jsonify({'videoUrl': 'http://yourserver.com/generated_video/output.mp4'})
+
+if __name__ == '__main__':
+    app.run(debug=True)
